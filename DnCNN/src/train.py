@@ -67,10 +67,10 @@ def main():
             count_iter += 1
             # print(loss.item(), "++")
             if count_iter % 100 == 0:
-                if count_iter == 3200:
-                    src.evaluate.show_tensor(img[0])
-                    src.evaluate.show_tensor(img_n[0])
-                    src.evaluate.show_tensor(output[0])
+                # if count_iter == 3200:
+                #     src.evaluate.show_tensor(img[0])
+                #     src.evaluate.show_tensor(img_n[0])
+                #     src.evaluate.show_tensor(output[0])
                 # print(src.evaluate.cal_psnr(img[0], img_n[0], torch.Tensor([1]).to(args.device)))
                 # print(src.evaluate.cal_psnr(img[0], output[0], torch.Tensor([1]).to(args.device)))
                 end_time = time.time()
