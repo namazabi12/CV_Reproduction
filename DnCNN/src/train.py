@@ -26,16 +26,18 @@ def main():
     dataset_train = MyDataset(path_train)
     dataset_valid = MyDataset(path_valid)
     loader_train = DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True)
-    loader_valid = DataLoader(dataset_valid, batch_size=7, shuffle=True)
+    # loader_valid = DataLoader(dataset_valid, batch_size=7, shuffle=True)
 
     model_name = "DnCNN_" + args.noise_mode
-    net = DnCNN(args.num_layers, args.num_channels, args.num_features).to(args.device)
-
+    # net = DnCNN(args.num_layers, args.num_channels, args.num_features).to(args.device)
+    net = torch.load("../model/DnCNNDnCNN_B.pth").to(args.device)
     loss_fn = nn.MSELoss().to(args.device)
 
     optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.milestone, gamma=0.1)
     max_psnr = 0
+
+    print("Start Training, Device = {:s}".format(args.device))
     for i in range(args.epoch):
         print("-----Round{:3d} training begins-----".format(i + 1))
 
@@ -52,7 +54,7 @@ def main():
                 n_shape = img[0].shape
                 for j in range(img.shape[0]):
                     noise_level = random.uniform(0., args.noise_level_max)
-                    noise[j] = torch.FloatTensor(n_shape).normal_(mean=0, std=noise_level/255.).to(args.device)
+                    noise[j] = torch.FloatTensor(n_shape).to(args.device).normal_(mean=0, std=noise_level/255.).to(args.device)
 
             img = img.to(args.device)
             img_n = torch.clamp(img + noise, 0., 1.)

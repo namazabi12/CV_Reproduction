@@ -62,16 +62,16 @@ class MyDataset(Dataset):
 
 
 if __name__ == "__main__":
-    pass
-    # path_train = "../dataset/train/test_{:03d}.png"
-    # path_valid = "../dataset/Set12/{:02d}.png"
-    # save_train = "../dataset/DnCNN_S_train"
-    # save_valid = "../dataset/DnCNN_S_valid"
-    #
-    # data_prepare(path_train, 400, int(128*1600/400), 40, save_train)
+    # pass
+    path_train = "../dataset/train/test_{:03d}.png"
+    path_valid = "../dataset/Set12/{:02d}.png"
+    save_train = "../dataset/DnCNN_S_train"
+    save_valid = "../dataset/DnCNN_S_valid"
+
+    data_prepare(path_train, 400, int(128*1600/400), 40, save_train)
     # data_prepare(path_valid, 12, 1, 0, save_valid)
     #
-    # md_train = MyDataset(save_train + ".h5")
+    md_train = MyDataset(save_train + ".h5")
     # md_valid = MyDataset(save_valid + ".h5")
     #
     # print(len(md_train))

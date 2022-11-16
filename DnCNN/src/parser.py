@@ -5,7 +5,7 @@ def get_parser(description):
     _parser = argparse.ArgumentParser(description=description)
 
     _parser.add_argument("--gpu", type=int, default=0)
-    _parser.add_argument("--device", type=str, default="cuda")
+    _parser.add_argument("--device", type=str, default="cuda:0")
 
     _parser.add_argument("--num_channels", type=int, default=1)
     _parser.add_argument("--num_features", type=int, default=64)
