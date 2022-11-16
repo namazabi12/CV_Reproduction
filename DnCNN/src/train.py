@@ -33,14 +33,15 @@ def main():
     net = torch.load("../model/DnCNNDnCNN_B.pth").to(args.device)
     loss_fn = nn.MSELoss().to(args.device)
 
-    optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.milestone, gamma=0.1)
+    # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=np.)
     max_psnr = 0
 
     print("Start Training, Device = {:s}".format(args.device))
     for i in range(args.epoch):
         print("-----Round{:3d} training begins-----".format(i + 1))
-
+        print("lr = {:.5f}".format(optimizer.state_dict()['param_groups'][0]['lr']))
         # Train
         net.train()
         count_iter = 0
