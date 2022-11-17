@@ -1,5 +1,5 @@
 import time
-
+import logging
 import torch
 from torch import nn
 import random
@@ -12,7 +12,7 @@ from torch.utils.data.dataloader import DataLoader
 parser_ = src.parser.get_parser("DnCNN")
 # noise
 parser_.add_argument("--noise_level", type=float, default=15)
-parser_.add_argument("--noise_mode", type=str, default="B", help="known noise level(S) or blind(B)")
+parser_.add_argument("--noise_mode", type=str, default="S", help="known noise level(S) or blind(B)")
 parser_.add_argument("--noise_level_val", type=float, default=15)
 parser_.add_argument("--noise_level_max", type=float, default=55)
 
@@ -28,14 +28,17 @@ def main():
     loader_train = DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True)
     # loader_valid = DataLoader(dataset_valid, batch_size=7, shuffle=True)
 
-    model_name = "DnCNN_" + args.noise_mode
-    # net = DnCNN(args.num_layers, args.num_channels, args.num_features).to(args.device)
-    net = torch.load("../model/DnCNNDnCNN_B.pth").to(args.device)
+    if args.noise_mode == "S":
+        model_name = "DnCNN_S_" + args.noise_level
+    else:
+        model_name = "DnCNN_B"
+    net = DnCNN(args.num_layers, args.num_channels, args.num_features).to(args.device)
+    # net = torch.load("../model/DnCNNDnCNN_B.pth").to(args.device)
     loss_fn = nn.MSELoss().to(args.device)
 
     optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.milestone, gamma=0.1)
-    # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=np.)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.milestone, gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.89)
     max_psnr = 0
 
     print("Start Training, Device = {:s}".format(args.device))
@@ -109,7 +112,7 @@ def main():
         #
         # if total_valid_psnr > max_psnr:
         #     max_psnr = total_valid_psnr
-        torch.save(net, "../model/DnCNN" + model_name + ".pth")
+        torch.save(net, "../model/" + model_name + ".pth")
         # print("valid_psnr = {:5.2f}".format(total_valid_psnr[0] / len(dataset_valid)))
 
 
