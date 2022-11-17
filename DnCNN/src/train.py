@@ -41,10 +41,11 @@ def main():
     # loader_valid = DataLoader(dataset_valid, batch_size=7, shuffle=True)
 
     net = DnCNN(args.num_layers, args.num_channels, args.num_features).to(args.device)
-    # net = torch.load("../model/DnCNNDnCNN_B.pth").to(args.device)
+    # net = torch.load("../model/DnCNN_S_15.pth").to(args.device)
     loss_fn = nn.MSELoss().to(args.device)
 
-    optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    # optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.milestone, gamma=0.1)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.89)
     max_psnr = 0
@@ -63,7 +64,7 @@ def main():
         for img in loader_train:
             # print(img.shape)
             if args.noise_mode == "S":
-                noise = torch.FloatTensor(img.shape).normal_(mean=0, std=args.noise_level/255.).to(args.device)
+                noise = torch.FloatTensor(img.shape).to(args.device).normal_(mean=0, std=args.noise_level/255.).to(args.device)
             else:
                 noise = torch.zeros(img.shape).to(args.device)
                 n_shape = img[0].shape
@@ -72,24 +73,14 @@ def main():
                     noise[j] = torch.FloatTensor(n_shape).to(args.device).normal_(mean=0, std=noise_level/255.).to(args.device)
 
             img = img.to(args.device)
-            img_n = torch.clamp(img + noise, 0., 1.)
+            img_n = img + noise
             output = net(img_n)
-            # if count_iter
-            # print(torch.mean(img), torch.mean(noise), torch.mean(img_n), torch.mean(output))
             optimizer.zero_grad()
-            loss = loss_fn(output, img) / (img.shape[0] * 2)
-            # print(loss.item(), (img.shape[0] * 2))
+            loss = loss_fn(output, noise) / (img.shape[0] * 2)
             loss.backward()
             optimizer.step()
             count_iter += 1
-            # print(loss.item(), "++")
             if count_iter % 100 == 0:
-                # if count_iter == 3200:
-                #     src.evaluate.show_tensor(img[0])
-                #     src.evaluate.show_tensor(img_n[0])
-                #     src.evaluate.show_tensor(output[0])
-                # print(src.evaluate.cal_psnr(img[0], img_n[0], torch.Tensor([1]).to(args.device)))
-                # print(src.evaluate.cal_psnr(img[0], output[0], torch.Tensor([1]).to(args.device)))
                 end_time = time.time()
                 logging.info("iter {:4d} finished, loss = {:.10f}, cost time = {:5.2f}".format(count_iter,
                                                                                                loss.item(),

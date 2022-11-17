@@ -30,7 +30,8 @@ if __name__ == "__main__":
     for i in range(1, 13):
         # test_input = read_image("../datasets/test/2022-11-09_19_38_12_840.bmp").unsqueeze(0).cuda()
         # print(test_input.shape)
-        test_target =  read_image("../dataset/train/test_{:03d}.png".format(i)).unsqueeze(0)
+        # test_target =  read_image("../dataset/train/test_{:03d}.png".format(i)).unsqueeze(0)
+        test_target =  read_image("../dataset/Set12/{:02d}.png".format(i)).unsqueeze(0)
         # test_target = read_image("../dataset/Set14/image_SRF_2/img_{:03d}_SRF_2_HR.png".format(i)).unsqueeze(0).cuda()
         noise = torch.FloatTensor(test_target.shape).normal_(mean=0, std=15./255.)
         test_input = torch.clamp(test_target + noise, 0., 1.)

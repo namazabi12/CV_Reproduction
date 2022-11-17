@@ -29,4 +29,4 @@ class DnCNN(nn.Module):
 
     def forward(self, img):
         output = self.dncnn(img)
-        return img - output
+        return output
