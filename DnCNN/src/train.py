@@ -1,5 +1,6 @@
 import time
 import logging
+import os
 import torch
 from torch import nn
 import random
@@ -20,7 +21,17 @@ args = parser_.parse_args()
 
 
 def main():
-    print("Loading Dataset")
+    if args.noise_mode == "S":
+        model_name = "DnCNN_S_" + str(args.noise_level)
+    else:
+        model_name = "DnCNN_B"
+
+    if os.path.exists("../logging") == 0:
+        os.mkdir("../logging")
+    logging.basicConfig(filename="../logging/logging_{:s}.txt".format(model_name), filemode="w", level=logging.DEBUG,
+                        format='%(asctime)s - %(message)s')
+    # print("Loading Dataset")
+    logging.info("Start Loading Dataset")
     path_train = "../dataset/DnCNN_S_train.h5"
     path_valid = "../dataset/DnCNN_S_valid.h5"
     dataset_train = MyDataset(path_train)
@@ -28,10 +39,6 @@ def main():
     loader_train = DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True)
     # loader_valid = DataLoader(dataset_valid, batch_size=7, shuffle=True)
 
-    if args.noise_mode == "S":
-        model_name = "DnCNN_S_" + args.noise_level
-    else:
-        model_name = "DnCNN_B"
     net = DnCNN(args.num_layers, args.num_channels, args.num_features).to(args.device)
     # net = torch.load("../model/DnCNNDnCNN_B.pth").to(args.device)
     loss_fn = nn.MSELoss().to(args.device)
@@ -41,10 +48,13 @@ def main():
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.89)
     max_psnr = 0
 
-    print("Start Training, Device = {:s}".format(args.device))
+    logging.info("Start Training: {:s}".format(model_name))
+    # print("Start Training, Device = {:s}".format(args.device))
     for i in range(args.epoch):
-        print("-----Round{:3d} training begins-----".format(i + 1))
-        print("lr = {:.5f}".format(optimizer.state_dict()['param_groups'][0]['lr']))
+        logging.info("-----Round{:3d} training begins-----".format(i + 1))
+        # print("-----Round{:3d} training begins-----".format(i + 1))
+        logging.info("lr = {:.5f}".format(optimizer.state_dict()['param_groups'][0]['lr']))
+        # print("lr = {:.5f}".format(optimizer.state_dict()['param_groups'][0]['lr']))
         # Train
         net.train()
         count_iter = 0
@@ -80,9 +90,12 @@ def main():
                 # print(src.evaluate.cal_psnr(img[0], img_n[0], torch.Tensor([1]).to(args.device)))
                 # print(src.evaluate.cal_psnr(img[0], output[0], torch.Tensor([1]).to(args.device)))
                 end_time = time.time()
-                print("iter {:4d} finished, loss = {:.10f}, cost time = {:5.2f}".format(count_iter,
-                                                                                        loss.item(),
-                                                                                        end_time - start_time))
+                logging.info("iter {:4d} finished, loss = {:.10f}, cost time = {:5.2f}".format(count_iter,
+                                                                                               loss.item(),
+                                                                                               end_time - start_time))
+                # print("iter {:4d} finished, loss = {:.10f}, cost time = {:5.2f}".format(count_iter,
+                #                                                                         loss.item(),
+                #                                                                         end_time - start_time))
                 start_time = time.time()
 
         scheduler.step()
