@@ -24,10 +24,10 @@ def show_tensor(tensor):
 
 
 if __name__ == "__main__":
-    model_name = "../model/DnCNNDnCNN_B.pth"
+    model_name = "../model/DnCNN_S_15.pth"
     net = torch.load(model_name)
 
-    for i in range(1, 12):
+    for i in range(1, 13):
         # test_input = read_image("../datasets/test/2022-11-09_19_38_12_840.bmp").unsqueeze(0).cuda()
         # print(test_input.shape)
         test_target =  read_image("../dataset/train/test_{:03d}.png".format(i)).unsqueeze(0)
@@ -38,10 +38,12 @@ if __name__ == "__main__":
         test_target, test_input = test_target.cuda(), test_input.cuda()
 
         test_output = net(test_input)
-        show_tensor(test_input[0])
-        show_tensor(test_target[0])
-        show_tensor(torch.clamp(test_output[0], 0., 1.))
-        print(cal_psnr(test_input[0], test_target[0], torch.Tensor([1]).cuda()))
-        print(cal_psnr(test_output[0], test_target[0], torch.Tensor([1]).cuda()))
-        break
+        # show_tensor(test_input[0])
+        # show_tensor(test_target[0])
+        # show_tensor(torch.clamp(test_output[0], 0., 1.))
+        print("Image index: {:2d}".format(i))
+        # print(cal_psnr(test_input[0], test_output[0], torch.Tensor([1]).cuda()))
+        print("PSNR_output_input  = {:.4f}".format(cal_psnr(test_input[0], test_target[0], torch.Tensor([1]).cuda())[0]))
+        print("PSNR_output_target = {:.4f}".format(cal_psnr(test_output[0], test_target[0], torch.Tensor([1]).cuda())[0]))
+        # break
 
