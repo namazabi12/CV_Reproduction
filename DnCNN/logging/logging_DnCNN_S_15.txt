@@ -1,4 +1,4 @@
-2022-11-17 14:13:50,274 - Start Loading Dataset
-2022-11-17 14:13:51,189 - Start Training: DnCNN_S_15
-2022-11-17 14:13:51,189 - -----Round  1 training begins-----
-2022-11-17 14:13:51,189 - lr = 0.10000
+2022-11-17 14:45:00,391 - Start Loading Dataset
+2022-11-17 14:45:01,421 - Start Training: DnCNN_S_15
+2022-11-17 14:45:01,421 - -----Round  1 training begins-----
+2022-11-17 14:45:01,421 - lr = 0.10000

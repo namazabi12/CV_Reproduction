@@ -4,13 +4,14 @@ import os
 import torch
 from torch import nn
 import random
-from src.data import *
-from src.model import *
-import src.evaluate
-import src.parser
+from data import *
+from model import *
+# import evaluate
+import myparser
 from torch.utils.data.dataloader import DataLoader
 
-parser_ = src.parser.get_parser("DnCNN")
+
+parser_ = myparser.get_parser("DnCNN")
 # noise
 parser_.add_argument("--noise_level", type=float, default=15)
 parser_.add_argument("--noise_mode", type=str, default="S", help="known noise level(S) or blind(B)")
