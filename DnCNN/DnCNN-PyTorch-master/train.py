@@ -7,7 +7,7 @@ import torch.optim as optim
 import torchvision.utils as utils
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-from tensorboardX import SummaryWriter
+# from tensorboard import SummaryWriter
 from models import DnCNN
 from dataset import prepare_data, Dataset
 from utils import *
@@ -46,7 +46,7 @@ def main():
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     # training
-    writer = SummaryWriter(opt.outf)
+    # writer = SummaryWriter(opt.outf)
     step = 0
     noiseL_B=[0,55] # ingnored when opt.mode=='S'
     for epoch in range(opt.epochs):
@@ -87,10 +87,10 @@ def main():
             print("[epoch %d][%d/%d] loss: %.4f PSNR_train: %.4f" %
                 (epoch+1, i+1, len(loader_train), loss.item(), psnr_train))
             # if you are using older version of PyTorch, you may need to change loss.item() to loss.data[0]
-            if step % 10 == 0:
+            # if step % 10 == 0:
                 # Log the scalar values
-                writer.add_scalar('loss', loss.item(), step)
-                writer.add_scalar('PSNR on training data', psnr_train, step)
+                # writer.add_scalar('loss', loss.item(), step)
+                # writer.add_scalar('PSNR on training data', psnr_train, step)
             step += 1
         ## the end of each epoch
         model.eval()
@@ -105,15 +105,15 @@ def main():
             psnr_val += batch_PSNR(out_val, img_val, 1.)
         psnr_val /= len(dataset_val)
         print("\n[epoch %d] PSNR_val: %.4f" % (epoch+1, psnr_val))
-        writer.add_scalar('PSNR on validation data', psnr_val, epoch)
+        # writer.add_scalar('PSNR on validation data', psnr_val, epoch)
         # log the images
         out_train = torch.clamp(imgn_train-model(imgn_train), 0., 1.)
         Img = utils.make_grid(img_train.data, nrow=8, normalize=True, scale_each=True)
         Imgn = utils.make_grid(imgn_train.data, nrow=8, normalize=True, scale_each=True)
         Irecon = utils.make_grid(out_train.data, nrow=8, normalize=True, scale_each=True)
-        writer.add_image('clean image', Img, epoch)
-        writer.add_image('noisy image', Imgn, epoch)
-        writer.add_image('reconstructed image', Irecon, epoch)
+        # writer.add_image('clean image', Img, epoch)
+        # writer.add_image('noisy image', Imgn, epoch)
+        # writer.add_image('reconstructed image', Irecon, epoch)
         # save model
         torch.save(model.state_dict(), os.path.join(opt.outf, 'net.pth'))
 

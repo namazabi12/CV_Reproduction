@@ -4,6 +4,7 @@ import random
 from PIL import Image
 from torchvision import transforms
 import numpy as np
+from skimage.metrics import peak_signal_noise_ratio as compare_psnr
 
 
 def read_image(path):
@@ -26,7 +27,9 @@ def show_tensor(tensor):
 if __name__ == "__main__":
     model_name = "../model/DnCNN_S_15.pth"
     net = torch.load(model_name)
-
+    print(torch.cuda.device_count())
+    for para in net.parameters():
+        print(para)
     for i in range(1, 13):
         # test_input = read_image("../datasets/test/2022-11-09_19_38_12_840.bmp").unsqueeze(0).cuda()
         # print(test_input.shape)
@@ -38,12 +41,12 @@ if __name__ == "__main__":
 
         test_target, test_input = test_target.cuda(), test_input.cuda()
 
-        test_output = net(test_input)
+        test_output = test_input - net(test_input)
         # show_tensor(test_input[0])
         # show_tensor(test_target[0])
         # show_tensor(torch.clamp(test_output[0], 0., 1.))
         print("Image index: {:2d}".format(i))
-        # print(cal_psnr(test_input[0], test_output[0], torch.Tensor([1]).cuda()))
+        print(cal_psnr(test_input[0], test_output[0], torch.Tensor([1]).cuda()))
         print("PSNR_output_input  = {:.4f}".format(cal_psnr(test_input[0], test_target[0], torch.Tensor([1]).cuda())[0]))
         print("PSNR_output_target = {:.4f}".format(cal_psnr(test_output[0], test_target[0], torch.Tensor([1]).cuda())[0]))
         # break

@@ -13,17 +13,17 @@ class DnCNN(nn.Module):
         self.layers = []
 
         self.layers.append(nn.Conv2d(self.num_channels, self.num_features,
-                                     kernel_size=3, padding=1))
-        self.layers.append(nn.ReLU())
+                                     kernel_size=3, padding=1, bias=False))
+        self.layers.append(nn.ReLU(inplace=True))
 
         for i in range(self.num_layers - 2):
             self.layers.append(nn.Conv2d(self.num_features, self.num_features,
-                                         kernel_size=3, padding=1))
+                                         kernel_size=3, padding=1, bias=False))
             self.layers.append(nn.BatchNorm2d(num_features=self.num_features))
-            self.layers.append(nn.ReLU())
+            self.layers.append(nn.ReLU(inplace=True))
 
         self.layers.append(nn.Conv2d(self.num_features, self.num_channels,
-                                     kernel_size=3, padding=1))
+                                     kernel_size=3, padding=1, bias=False))
 
         self.dncnn = nn.Sequential(*self.layers)
 
