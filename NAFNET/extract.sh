@@ -1,0 +1,1 @@
+python3 ./scripts/data_preparation/extract_subimages.py
