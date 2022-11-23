@@ -10,7 +10,8 @@ def get_parser(description):
     _parser.add_argument("--num_channels", type=int, default=1)
     _parser.add_argument("--num_features", type=int, default=64)
     _parser.add_argument("--num_layers", type=int, default=17)
-    _parser.add_argument("--batch_size", type=int, default=32)
+    _parser.add_argument("--batch_size", type=int, default=128)
+    _parser.add_argument("--iter", type=int, default=1600)
 
     _parser.add_argument("--weight_decay", type=float, default=0.0001)
     _parser.add_argument("--lr", type=float, default=0.1)

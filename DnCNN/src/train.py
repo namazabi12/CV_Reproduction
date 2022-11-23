@@ -6,10 +6,10 @@ from torch import nn
 import random
 from data import *
 from model import *
-# import evaluate
+import evaluate
 import myparser
 from torch.utils.data.dataloader import DataLoader
-from skimage.metrics import peak_signal_noise_ratio as compare_psnr
+# from skimage.metrics import peak_signal_noise_ratio as compare_psnr
 
 
 parser_ = myparser.get_parser("DnCNN")
@@ -23,13 +23,15 @@ args = parser_.parse_args()
 
 
 class Trainer:
-    def __init__(self, dataloader, net, optimizer, loss_fn, logger, scheduler=None):
-        self.dataloader = dataloader
+    def __init__(self, dataloader_train, dataloader_valid, net, optimizer, loss_fn, logger, scheduler=None):
+        self.dataloader_train = dataloader_train
+        self.dataloader_valid = dataloader_valid
         self.net = net
         self.optimizer = optimizer
         self.loss_fn = loss_fn
         self.logger = logger
         self.scheduler = scheduler
+        self.num_valid = None
 
     def train(self, index):
         self.logger.info("-----Round{:3d} training begins-----".format(index + 1))
@@ -37,7 +39,7 @@ class Trainer:
         count_iter = 0
         self.net.train()
         start_time = time.time()
-        for _img in self.dataloader:
+        for _img in self.dataloader_train:
             self.optimizer.zero_grad()
             _img = _img.to(args.device)
             # _img_noise = _img_noise.to(args.device)
@@ -55,10 +57,9 @@ class Trainer:
             # show_tensor(_img_noise[0])
             # break
             _output = self.net(_img_noise)
-            _loss = self.loss_fn(_output, _img_noise - _img) / (_img.shape[0] * 2)
+            _loss = self.loss_fn(_output, _img_noise - _img)
             _loss.backward()
             self.optimizer.step()
-
             count_iter += 1
             if count_iter % 100 == 0:
                 end_time = time.time()
@@ -70,7 +71,30 @@ class Trainer:
             self.scheduler.step()
 
     def eval(self):
-        pass
+        self.num_valid = 0
+        self.net.eval()
+        with torch.no_grad():
+            total_psnr = 0
+            for _img in self.dataloader_valid:
+                self.num_valid += 1
+                # _img, _img_noise = _img.to(args.device), _img_noise.to(args.device)
+                _img = _img.to(args.device)
+                # _img_noise = _img_noise.to(args.device)
+                if args.noise_mode == "S":
+                    _noise = torch.FloatTensor(_img.shape).normal_(mean=0, std=args.noise_level / 255.).to(args.device)
+                else:
+                    _noise = torch.zeros(_img.shape).to(args.device)
+                    _n_shape = _img[0].shape
+                    for j in range(_img.shape[0]):
+                        _noise_level = random.uniform(0., args.noise_level_max)
+                        _noise[j] = torch.FloatTensor(_n_shape).normal_(mean=0, std=_noise_level / 255.).to(args.device)
+
+                _img_noise = _img + _noise
+                _output = _img_noise - self.net(_img_noise)
+                _psnr = evaluate.cal_psnr(_output, _img, torch.Tensor([1]).to(args.device))[0]
+                total_psnr += _psnr
+                # self.logger.info("PSNR = {:.4f}".format(_psnr))
+            self.logger.info("valid average PSNR = {:.4f}".format(total_psnr / self.num_valid))
 
 
 def main():
@@ -84,12 +108,12 @@ def main():
 
     logger = logging.getLogger()
     filehandler = logging.FileHandler(filename="../logging/logging_{:s}.txt".format(model_name), mode="w")
-    # streamhandler = logging.StreamHandler()
+    streamhandler = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(message)s')
     filehandler.setFormatter(formatter)
-    # streamhandler.setFormatter(formatter)
+    streamhandler.setFormatter(formatter)
     logger.addHandler(filehandler)
-    # logger.addHandler(streamhandler)
+    logger.addHandler(streamhandler)
     logger.setLevel('DEBUG')
 
     # logging.basicConfig(filename="../logging/logging_{:s}.txt".format(model_name), filemode="w", level=logging.DEBUG,
@@ -97,10 +121,17 @@ def main():
     # # print("Loading Dataset")
     # logging.info("Start Loading Dataset")
     path_train = "../dataset/train/test_{:03d}.png"
-    # path_valid = "../dataset/DnCNN_S_valid.h5"
-    dataset_train = MyDataset(path_train, 400, int(128*1600/400), 40, logger)
+    path_valid = "../dataset/Set68/test{:03d}.png"
+    dataset_train = MyDataset(path_train, 400, args, int(128*args.iter/400), 60, logger)
+    dataset_valid = MyDataset(path_train, 68, args)
+
+    # if args.noise_mode == "S":
+    #     dataset_train = MyDataset(path_train, 400, int(128*1600/400), 60, logger)
+    # else:
+    #     dataset_train = MyDataset(path_train, 400, int(128*3000/400), 60, logger)
     # dataset_valid = MyDataset(path_valid)
     loader_train = DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True)
+    loader_valid = DataLoader(dataset_valid, batch_size=1, shuffle=False)
     # loader_valid = DataLoader(dataset_valid, batch_size=7, shuffle=True)
 
     net = DnCNN(args.num_layers, args.num_channels, args.num_features)
@@ -117,12 +148,14 @@ def main():
     loss_fn = nn.MSELoss().to(args.device)
 
     optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    # optimizer = torch.optim.Adam(net.parameters(), lr=args.lr, )
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.milestone, gamma=0.1)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.89)
-    trainer = Trainer(loader_train, model, optimizer, loss_fn, logger, scheduler)
+    trainer = Trainer(loader_train, loader_valid, model, optimizer, loss_fn, logger, scheduler)
 
     for i in range(args.epoch):
         trainer.train(i)
+        trainer.eval()
         torch.save(trainer.net, "../model/" + model_name + ".pth")
     max_psnr = 0
 

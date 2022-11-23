@@ -60,7 +60,7 @@ def show_tensor(tensor):
 
 
 class MyDataset(Dataset):
-    def __init__(self, data_dir: str, num_img, num_patch=None, crop_size=None, logger=None):
+    def __init__(self, data_dir: str, num_img, args, num_patch=None, crop_size=None, logger=None):
         super(Dataset, self).__init__()
         self.data_dir = data_dir
         self.num_img = num_img
@@ -90,15 +90,22 @@ class MyDataset(Dataset):
                 self.img = read_image(self.data_dir.format(i))
                 self.data.append(self.img)
 
-        # for _img in self.data:
-        #     noise = torch.FloatTensor(_img.shape).normal_(mean=0, std=15./255.)
-        #     self.data_noise.append(_img + noise)
+        # if args.noise_mode == "S":
+        #     for _img in self.data:
+        #         noise = torch.FloatTensor(_img.shape).normal_(mean=0, std=args.noise_level/255.)
+        #         self.data_noise.append(_img + noise)
+        # else:
+        #     for _img in self.data:
+        #         _noise_level = random.uniform(0., args.noise_level_max)
+        #         noise = torch.FloatTensor(_img.shape).normal_(mean=0, std=_noise_level/255.)
+        #         self.data_noise.append(_img + noise)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
         return self.data[index]
+               # self.data_noise[index]
 
 
 if __name__ == "__main__":
