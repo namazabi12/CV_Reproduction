@@ -104,3 +104,5 @@ logger:
 dist_params:
   backend: nccl
   port: 29500
+
+find_unused_parameters: true
