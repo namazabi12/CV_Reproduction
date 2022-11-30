@@ -57,6 +57,7 @@ path:
 
 # training settings
 train:
+  ema_decay: 0
   optim_g:
     type: AdamW
     lr: !!float 1e-3

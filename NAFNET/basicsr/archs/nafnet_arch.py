@@ -1,5 +1,6 @@
 import torch
 from torch import nn as nn
+import torch.nn.functional as F
 
 from basicsr.archs.arch_util import ResidualBlockNoBN, Upsample, make_layer
 from basicsr.utils.registry import ARCH_REGISTRY
@@ -12,7 +13,7 @@ class SimpleGate(nn.Module):
 
 
 class NAFBlock(nn.Module):
-    def __init__(self, c, DW_Expand, FFN_Expend):
+    def __init__(self, c, DW_Expand=2, FFN_Expend=2):
         super(NAFBlock, self).__init__()
         dw_channels = c * DW_Expand
         ffn_channels = c * FFN_Expend
@@ -54,7 +55,6 @@ class NAFBlock(nn.Module):
         return x2 + x1
 
 
-
 @ARCH_REGISTRY.register()
 class NAFNET(nn.Module):
     """NAFNET network structure.
@@ -78,35 +78,65 @@ class NAFNET(nn.Module):
     """
 
     def __init__(self,
-                 num_in_ch,
-                 num_out_ch,
-                 num_feat=64,
-                 num_block=16,
-                 upscale=4,
-                 res_scale=1,
-                 img_range=255.,
-                 rgb_mean=(0.4488, 0.4371, 0.4040)):
+                 img_channels=3,
+                 width=32,
+                 enc_block_nums=[2, 2, 4, 8],
+                 mid_block_nums=12,
+                 dec_block_nums=[2, 2, 2, 2]):
         super(NAFNET, self).__init__()
 
-        self.img_range = img_range
-        self.mean = torch.Tensor(rgb_mean).view(1, 3, 1, 1)
+        self.begin = nn.Conv2d(img_channels, width, 3, 1, 1)
 
-        self.conv_first = nn.Conv2d(num_in_ch, num_feat, 3, 1, 1)
-        self.body = make_layer(ResidualBlockNoBN, num_block, num_feat=num_feat, res_scale=res_scale, pytorch_init=True)
-        self.conv_after_body = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
-        self.upsample = Upsample(upscale, num_feat)
-        self.conv_last = nn.Conv2d(num_feat, num_out_ch, 3, 1, 1)
-        self.ln = nn.LayerNorm()
+        self.enc_block = []
+        self.down_block = []
+        ch = width
+        for num in enc_block_nums:
+            self.enc_block.append(nn.Sequential(*[NAFBlock(ch) for _ in range(num)]))
+            self.down_block.append(nn.Conv2d(ch, ch * 2, 2, 2))
+            ch *= 2
 
-    def forward(self, x):
-        self.mean = self.mean.type_as(x)
+        self.mid_block = nn.Sequential(*[NAFBlock(ch) for _ in range(mid_block_nums)])
 
-        x = (x - self.mean) * self.img_range
-        x = self.conv_first(x)
-        res = self.conv_after_body(self.body(x))
-        res += x
+        self.dec_block = []
+        self.up_block = []
+        for num in dec_block_nums:
+            self.up_block.append(nn.Sequential(
+                nn.Conv2d(ch, ch * 2, 1, bias=False),
+                nn.PixelShuffle(2)
+            ))
+            ch /= 2
+            self.dec_block.append(nn.Sequential(*[NAFBlock(ch) for _ in range(num)]))
 
-        x = self.conv_last(self.upsample(res))
-        x = x / self.img_range + self.mean
+        self.end = nn.Conv2d(width, img_channels, 3, 1, 1)
 
-        return x
+        self.mod = 2 ** len(enc_block_nums)
+
+    def forward(self, inp):
+        h, w = inp.shape[-2], inp.shape[-1]
+        inp = self.pad_to_pow(inp)
+        x = inp
+        x = self.begin(x)
+
+        skips = []
+
+        for enc, down in zip(self.enc_block, self.down_block):
+            x = enc(x)
+            skips.append(x)
+            x = down(x)
+
+        x = self.mid_block(x)
+
+        for dec, up, skip in zip(self.dec_block, self.up_block, skips[::-1]):
+            x = up(x)
+            x = x + skip
+            x = dec(x)
+
+        x = self.end(x)
+        x = x + inp
+        return x[:, :, :h, :w]
+
+    def pad_to_pow(self, inp):
+        h, w = inp.shape[-2], inp.shape[-1]
+        h_pad = (self.mod - h % self.mod) % self.mod
+        w_pad = (self.mod - w % self.mod) % self.mod
+        return F.pad(inp, (0, w_pad, 0, h_pad))

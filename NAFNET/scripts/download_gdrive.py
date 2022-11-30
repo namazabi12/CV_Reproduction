@@ -9,4 +9,4 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=str, help='Save path')
     args = parser.parse_args()
 
-    download_file_from_google_drive(args.id, args.save_path)
+    download_file_from_google_drive(args.id, args.output)
