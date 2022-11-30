@@ -17,8 +17,7 @@ class NAFBlock(nn.Module):
         super(NAFBlock, self).__init__()
         dw_channels = c * DW_Expand
         ffn_channels = c * FFN_Expend
-
-        self.norm1 = nn.LayerNorm([1, c, 1, 1])
+        self.norm1 = nn.GroupNorm(1, c)
         self.conv1 = nn.Conv2d(in_channels=c, out_channels=dw_channels, kernel_size=1, stride=1, padding=0, groups=1,
                                bias=True)
         self.conv2 = nn.Conv2d(in_channels=dw_channels, out_channels=dw_channels, kernel_size=3, stride=1, padding=1,
@@ -32,7 +31,7 @@ class NAFBlock(nn.Module):
         self.conv3 = nn.Conv2d(in_channels=dw_channels // 2, out_channels=c, kernel_size=1, stride=1, padding=0,
                                groups=1, bias=True)
 
-        self.norm2 = nn.LayerNorm([1, c, 1, 1])
+        self.norm2 = nn.GroupNorm(1, c)
         self.conv4 = nn.Conv2d(in_channels=c, out_channels=ffn_channels, kernel_size=1, stride=1, padding=0, groups=1,
                                bias=True)
         self.conv5 = nn.Conv2d(in_channels=ffn_channels // 2, out_channels=c, kernel_size=1, stride=1, padding=0,
@@ -57,25 +56,6 @@ class NAFBlock(nn.Module):
 
 @ARCH_REGISTRY.register()
 class NAFNET(nn.Module):
-    """NAFNET network structure.
-
-    Paper: Enhanced Deep Residual Networks for Single Image Super-Resolution.
-    Ref git repo: https://github.com/thstkdgus35/EDSR-PyTorch
-
-    Args:
-        num_in_ch (int): Channel number of inputs.
-        num_out_ch (int): Channel number of outputs.
-        num_feat (int): Channel number of intermediate features.
-            Default: 64.
-        num_block (int): Block number in the trunk network. Default: 16.
-        upscale (int): Upsampling factor. Support 2^n and 3.
-            Default: 4.
-        res_scale (float): Used to scale the residual in residual block.
-            Default: 1.
-        img_range (float): Image range. Default: 255.
-        rgb_mean (tuple[float]): Image mean in RGB orders.
-            Default: (0.4488, 0.4371, 0.4040), calculated from DIV2K dataset.
-    """
 
     def __init__(self,
                  img_channels=3,
@@ -87,8 +67,8 @@ class NAFNET(nn.Module):
 
         self.begin = nn.Conv2d(img_channels, width, 3, 1, 1)
 
-        self.enc_block = []
-        self.down_block = []
+        self.enc_block = nn.ModuleList()
+        self.down_block = nn.ModuleList()
         ch = width
         for num in enc_block_nums:
             self.enc_block.append(nn.Sequential(*[NAFBlock(ch) for _ in range(num)]))
@@ -97,14 +77,14 @@ class NAFNET(nn.Module):
 
         self.mid_block = nn.Sequential(*[NAFBlock(ch) for _ in range(mid_block_nums)])
 
-        self.dec_block = []
-        self.up_block = []
+        self.dec_block = nn.ModuleList()
+        self.up_block = nn.ModuleList()
         for num in dec_block_nums:
             self.up_block.append(nn.Sequential(
                 nn.Conv2d(ch, ch * 2, 1, bias=False),
                 nn.PixelShuffle(2)
             ))
-            ch /= 2
+            ch //= 2
             self.dec_block.append(nn.Sequential(*[NAFBlock(ch) for _ in range(num)]))
 
         self.end = nn.Conv2d(width, img_channels, 3, 1, 1)
@@ -140,3 +120,10 @@ class NAFNET(nn.Module):
         h_pad = (self.mod - h % self.mod) % self.mod
         w_pad = (self.mod - w % self.mod) % self.mod
         return F.pad(inp, (0, w_pad, 0, h_pad))
+
+
+if __name__ == "__main__":
+    net = NAFNET()
+    cri = nn.MSELoss()
+    optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+

@@ -12,7 +12,7 @@ from multiprocessing import Pool
 from os import path as osp
 from tqdm import tqdm
 
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from basicsr.utils import scandir_SIDD
 from basicsr.utils.create_lmdb import create_lmdb_for_SIDD
@@ -29,11 +29,11 @@ def main():
     opt['step'] = 384
     opt['thresh_size'] = 0
     opt['keywords'] = '_NOISY'
-    extract_subimages(opt)
+    # extract_subimages(opt)
 
     opt['save_folder'] = './datasets/SIDD/train/gt_crops'
     opt['keywords'] = '_GT'
-    extract_subimages(opt)
+    # extract_subimages(opt)
 
     create_lmdb_for_SIDD()
 
