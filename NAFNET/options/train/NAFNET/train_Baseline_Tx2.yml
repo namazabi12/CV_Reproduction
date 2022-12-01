@@ -29,7 +29,7 @@ datasets:
     # data loader
     use_shuffle: true
     num_worker_per_gpu: 4
-    batch_size_per_gpu: 8
+    batch_size_per_gpu: 4
     dataset_enlarge_ratio: 1
     prefetch_mode: ~
 
@@ -43,11 +43,13 @@ datasets:
 
 
 network_g:
-  type: NAFNET
+  type: Baseline
   width: 32
   enc_block_nums: [2, 2, 4, 8]
   mid_block_nums: 12
   dec_block_nums: [2, 2, 2, 2]
+  sca: False
+  sg: False
 
 # path
 path:
@@ -74,13 +76,13 @@ train:
 
   # losses
   pixel_opt:
-    type: PSNRLoss
+    type: MSELoss
     loss_weight: 1
     reduction: mean
 
 # validation settings
 val:
-  val_freq: !!float 5e3
+  val_freq: !!float 1e4
   save_img: false
   use_image: false
 
