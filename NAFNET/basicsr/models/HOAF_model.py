@@ -12,11 +12,11 @@ from .base_model import BaseModel
 
 
 @MODEL_REGISTRY.register()
-class NAFNETModel(BaseModel):
+class HOAFModel(BaseModel):
     """Base SR model for single image super-resolution."""
 
     def __init__(self, opt):
-        super(NAFNETModel, self).__init__(opt)
+        super(HOAFModel, self).__init__(opt)
 
         # define network
         self.net_g = build_network(opt['network_g'])
