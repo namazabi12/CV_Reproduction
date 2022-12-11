@@ -3,6 +3,7 @@ from torch import nn as nn
 import torch.nn.functional as F
 
 from basicsr.utils.registry import ARCH_REGISTRY
+import time
 
 
 class SimpleGate(nn.Module):
@@ -15,70 +16,121 @@ class HOAF_Function(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, inp, num_groups, ch_per_gp, weight):
-        ctx.save_for_backward(inp, weight)
+        # ctx.save_for_backward(inp, weight)
+        # ctx.num_groups, ctx.ch_per_gp = num_groups, ch_per_gp
+        # output = torch.zeros_like(inp)
+        # for g in range(num_groups):
+        #     for c1 in range(ch_per_gp):
+        #         for c2 in range(c1, ch_per_gp):
+        #             cc1 = c1 + g * ch_per_gp
+        #             cc2 = c2 + g * ch_per_gp
+        #             res = inp[:, cc1, :, :] * inp[:, cc2, :, :] * weight[g][c1][c2]
+        #             output[:, cc1, :, :] += res
+        #             if cc1 != cc2:
+        #                 output[:, cc2, :, :] += res
+        # return output
+        # print(type(weight))
+        # bg = time.time()
+        ctx.save_for_backward(weight)
         ctx.num_groups, ctx.ch_per_gp = num_groups, ch_per_gp
-        output = torch.zeros_like(inp)
+        inp_c = torch.chunk(inp, num_groups * ch_per_gp, dim=1)
+        ctx.inp_c = inp_c
+        output_c = []
+        for i in range(num_groups * ch_per_gp):
+            output_c.append(torch.zeros_like(inp_c[0]))
         for g in range(num_groups):
             for c1 in range(ch_per_gp):
                 for c2 in range(c1, ch_per_gp):
                     cc1 = c1 + g * ch_per_gp
                     cc2 = c2 + g * ch_per_gp
-                    res = inp[:, cc1, :, :] * inp[:, cc2, :, :] * weight[g][c1][c2]
-                    output[:, cc1, :, :] += res
+                    res = inp_c[cc1] * inp_c[cc2]
+                    output_c[cc1] += res * weight[g][c1][c2]
                     if cc1 != cc2:
-                        output[:, cc2, :, :] += res
+                        output_c[cc2] += res * weight[g][c2][c1]
+        output = torch.cat(output_c, dim=1)
+        # print("forward: {:.2f}, {}, {}".format(time.time() - bg, num_groups * ch_per_gp, output_c[0].shape))
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
-        inp, weight = ctx.saved_tensors
+        # inp, weight = ctx.saved_tensors
+        # num_groups, ch_per_gp = ctx.num_groups, ctx.ch_per_gp
+        # grad_input = torch.zeros_like(grad_output)
+        # grad_group = grad_ch = None
+        # grad_weight = torch.zeros_like(weight)
+        #
+        # for g in range(num_groups):
+        #     for c1 in range(ch_per_gp):
+        #         for c2 in range(c1, ch_per_gp):
+        #             cc1 = c1 + g * ch_per_gp
+        #             cc2 = c2 + g * ch_per_gp
+        #             grad_input[:, cc1, :, :] += grad_output[:, cc1, :, :] * inp[:, cc2, :, :] * weight[g][c1][c2]
+        #             if cc1 != cc2:
+        #                 grad_input[:, cc2, :, :] += grad_output[:, cc2, :, :] * inp[:, cc1, :, :] * weight[g][c1][c2]
+        #             grad_weight[g][c1][c2] += ((grad_output[:, cc1, :, :] + grad_output[:, cc2, :, :]) *
+        #                                        inp[:, cc1, :, :] * inp[:, cc2, :, :]).sum()
+        # return grad_input, grad_group, grad_ch, grad_weight
+        # bg = time.time()
+        weight, = ctx.saved_tensors
+        # print(type(weight))
+        inp_c = ctx.inp_c
         num_groups, ch_per_gp = ctx.num_groups, ctx.ch_per_gp
-        grad_input = torch.zeros_like(grad_output)
-        grad_group = grad_ch = None
+        grad_output_c = torch.chunk(grad_output, num_groups * ch_per_gp, dim=1)
+        grad_input_c = []
+        for i in range(num_groups * ch_per_gp):
+            grad_input_c.append(torch.zeros_like(grad_output_c[0]))
         grad_weight = torch.zeros_like(weight)
+        grad_group = grad_ch = None
 
         for g in range(num_groups):
             for c1 in range(ch_per_gp):
                 for c2 in range(c1, ch_per_gp):
                     cc1 = c1 + g * ch_per_gp
                     cc2 = c2 + g * ch_per_gp
-                    grad_input[:, cc1, :, :] += grad_output[:, cc1, :, :] * inp[:, cc2, :, :] * weight[g][c1][c2]
+                    grad_input_c[cc1] += grad_output_c[cc1] * inp_c[cc2] * weight[g][c1][c2]
+                    inp_temp = inp_c[cc1] * inp_c[cc2]
+                    grad_weight[g][c1][c2] += (grad_output_c[cc1] * inp_temp).sum()
                     if cc1 != cc2:
-                        grad_input[:, cc2, :, :] += grad_output[:, cc2, :, :] * inp[:, cc1, :, :] * weight[g][c1][c2]
-                    grad_weight[g][c1][c2] += ((grad_output[:, cc1, :, :] + grad_output[:, cc2, :, :]) *
-                                               inp[:, cc1, :, :] * inp[:, cc2, :, :]).sum()
-
-                    # res = inp[:, cc1, :, :] * inp[:, cc2, :, :] * weight[g][c1][c2]
-                    # output[:, cc1, :, :] += res
-                    # if cc1 != cc2:
-                    #     output[:, cc2, :, :] += res
+                        grad_input_c[cc2] += grad_output_c[cc2] * inp_c[cc1] * weight[g][c2][c1]
+                        grad_weight[g][c2][c1] += (grad_output_c[cc2] * inp_temp).sum()
+        grad_input = torch.cat(grad_input_c, dim=1)
+        # print("backward: {:.2f}".format(time.time() - bg))
 
         return grad_input, grad_group, grad_ch, grad_weight
-
 
 class HOAF_Function_without_weight(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, inp, num_groups, ch_per_gp):
-        ctx.save_for_backward(inp)
+
+        # ctx.save_for_backward(inp)
         ctx.num_groups, ctx.ch_per_gp = num_groups, ch_per_gp
-        output = torch.zeros_like(inp)
+        inp_c = torch.chunk(inp, num_groups * ch_per_gp, dim=1)
+        ctx.inp_c = inp_c
+        output_c = []
+        for i in range(num_groups * ch_per_gp):
+            output_c.append(torch.zeros_like(inp_c[0]))
         for g in range(num_groups):
             for c1 in range(ch_per_gp):
                 for c2 in range(c1, ch_per_gp):
                     cc1 = c1 + g * ch_per_gp
                     cc2 = c2 + g * ch_per_gp
-                    res = inp[:, cc1, :, :] * inp[:, cc2, :, :]
-                    output[:, cc1, :, :] += res
+                    res = inp_c[cc1] * inp_c[cc2]
+                    output_c[cc1] += res
                     if cc1 != cc2:
-                        output[:, cc2, :, :] += res
+                        output_c[cc2] += res
+        output = torch.cat(output_c, dim=1)
         return output / num_groups
 
     @staticmethod
     def backward(ctx, grad_output):
-        inp, = ctx.saved_tensors
+        # inp_c, = ctx.saved_tensors
+        inp_c = ctx.inp_c
         num_groups, ch_per_gp = ctx.num_groups, ctx.ch_per_gp
-        grad_input = torch.zeros_like(grad_output)
+        grad_output_c = torch.chunk(grad_output, num_groups * ch_per_gp, dim=1)
+        grad_input_c = []
+        for i in range(num_groups * ch_per_gp):
+            grad_input_c.append(torch.zeros_like(grad_output_c[0]))
         grad_group = grad_ch = None
 
         for g in range(num_groups):
@@ -86,14 +138,10 @@ class HOAF_Function_without_weight(torch.autograd.Function):
                 for c2 in range(c1, ch_per_gp):
                     cc1 = c1 + g * ch_per_gp
                     cc2 = c2 + g * ch_per_gp
-                    grad_input[:, cc1, :, :] += grad_output[:, cc1, :, :] * inp[:, cc2, :, :] / num_groups
+                    grad_input_c[cc1] += grad_output_c[cc1] * inp_c[cc2] / num_groups
                     if cc1 != cc2:
-                        grad_input[:, cc2, :, :] += grad_output[:, cc2, :, :] * inp[:, cc1, :, :] / num_groups
-
-                    # res = inp[:, cc1, :, :] * inp[:, cc2, :, :] * weight[g][c1][c2]
-                    # output[:, cc1, :, :] += res
-                    # if cc1 != cc2:
-                    #     output[:, cc2, :, :] += res
+                        grad_input_c[cc2] += grad_output_c[cc2] * inp_c[cc1] / num_groups
+        grad_input = torch.cat(grad_input_c, dim=1)
 
         return grad_input, grad_group, grad_ch
 
@@ -125,6 +173,7 @@ class HOAF_Function_without_weight(torch.autograd.Function):
 0.36068853735923767 15.096582412719727
 """
 
+
 class HOAF(nn.Module):
     """HOAF(High Order Activation Function) structure.
 
@@ -148,8 +197,23 @@ class HOAF(nn.Module):
                                    requires_grad=True)
 
     def forward(self, inp):
-        # return HOAF_Function.apply(inp, self.num_groups, self.ch_per_gp, self.weight)
+        return HOAF_Function.apply(inp, self.num_groups, self.ch_per_gp, self.weight)
         return HOAF_Function_without_weight.apply(inp, self.num_groups, self.ch_per_gp)
+        inp_c = torch.chunk(inp, self.num_channels, dim=1)
+        output_c = []
+        for i in range(self.num_channels):
+            output_c.append(torch.zeros_like(inp_c[0]))
+        for g in range(self.num_groups):
+            for c1 in range(self.ch_per_gp):
+                for c2 in range(c1, self.ch_per_gp):
+                    cc1 = c1 + g * self.ch_per_gp
+                    cc2 = c2 + g * self.ch_per_gp
+                    res = inp_c[cc1] * inp_c[cc2]
+                    output_c[cc1] += res
+                    if cc1 != cc2:
+                        output_c[cc2] += res
+        output = torch.cat(output_c, dim=1)
+        return output / self.num_groups
 
 
 class NAFBlock_HOAF(nn.Module):
@@ -161,8 +225,8 @@ class NAFBlock_HOAF(nn.Module):
                                bias=True)
         self.conv2 = nn.Conv2d(in_channels=c, out_channels=c, kernel_size=3, stride=1, padding=1,
                                groups=c, bias=True)
-        # self.gate1 = HOAF(c // 4, c)
-        self.gate1 = nn.GELU()
+        self.gate1 = HOAF(c // 4, c)
+        # self.gate1 = nn.GELU()
         self.sca = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(in_channels=c, out_channels=c, kernel_size=1, stride=1, padding=0,
@@ -174,8 +238,8 @@ class NAFBlock_HOAF(nn.Module):
         self.norm2 = nn.GroupNorm(1, c)
         self.conv4 = nn.Conv2d(in_channels=c, out_channels=c, kernel_size=1, stride=1, padding=0, groups=1,
                                bias=True)
-        # self.gate2 = HOAF(c // 4, c)
-        self.gate2 = nn.GELU()
+        self.gate2 = HOAF(c // 4, c)
+        # self.gate2 = nn.GELU()
         self.conv5 = nn.Conv2d(in_channels=c, out_channels=c, kernel_size=1, stride=1, padding=0,
                                groups=1, bias=True)
 
