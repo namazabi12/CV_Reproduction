@@ -12,7 +12,7 @@ class SimpleGate(nn.Module):
 
 
 class BaselineBlock(nn.Module):
-    def __init__(self, c, DW_Expand=1, FFN_Expend=1, sca=False, sg=False):
+    def __init__(self, c, DW_Expand=1, FFN_Expend=2, sca=False, sg=False):
         super(BaselineBlock, self).__init__()
         dw_channels = c * DW_Expand
         ffn_channels = c * FFN_Expend
@@ -52,7 +52,7 @@ class BaselineBlock(nn.Module):
         self.norm2 = nn.GroupNorm(1, c)
         self.conv4 = nn.Conv2d(in_channels=c, out_channels=ffn_channels, kernel_size=1, stride=1, padding=0, groups=1,
                                bias=True)
-        self.conv5 = nn.Conv2d(in_channels=ffn_channels // self.p, out_channels=c, kernel_size=1, stride=1, padding=0,
+        self.conv5 = nn.Conv2d(in_channels=ffn_channels // 2, out_channels=c, kernel_size=1, stride=1, padding=0,
                                groups=1, bias=True)
 
         self.beta = nn.Parameter(torch.zeros((1, c, 1, 1)), requires_grad=True)
@@ -207,17 +207,14 @@ class Baseline(nn.Module):
 
         self.sca = sca
         self.sg = sg
-        if self.sg is True:
-            self.exp = 2
-        else:
-            self.exp = 1
+
         ch = width
         for num in enc_block_nums:
-            self.enc_block.append(nn.Sequential(*[BaselineBlock(ch, DW_Expand=self.exp, FFN_Expend=self.exp, sca=self.sca, sg=self.sg) for _ in range(num)]))
+            self.enc_block.append(nn.Sequential(*[BaselineBlock(ch, sca=self.sca, sg=self.sg) for _ in range(num)]))
             self.down_block.append(nn.Conv2d(ch, ch * 2, 2, 2))
             ch *= 2
 
-        self.mid_block = nn.Sequential(*[BaselineBlock(ch, DW_Expand=self.exp, FFN_Expend=self.exp, sca=self.sca, sg=self.sg) for _ in range(mid_block_nums)])
+        self.mid_block = nn.Sequential(*[BaselineBlock(ch, sca=self.sca, sg=self.sg) for _ in range(mid_block_nums)])
 
         self.dec_block = nn.ModuleList()
         self.up_block = nn.ModuleList()
@@ -227,7 +224,7 @@ class Baseline(nn.Module):
                 nn.PixelShuffle(2)
             ))
             ch //= 2
-            self.dec_block.append(nn.Sequential(*[BaselineBlock(ch, DW_Expand=self.exp, FFN_Expend=self.exp, sca=self.sca, sg=self.sg) for _ in range(num)]))
+            self.dec_block.append(nn.Sequential(*[BaselineBlock(ch, sca=self.sca, sg=self.sg) for _ in range(num)]))
 
         self.end = nn.Conv2d(width, img_channels, 3, 1, 1)
 

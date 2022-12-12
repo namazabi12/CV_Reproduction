@@ -6,7 +6,7 @@
 # ------------------------------------------------------------------------
 # general settings
 name: NAFNet-SIDD-width32-test
-model_type: ImageRestorationModel
+model_type: NAFNETModel
 scale: 1
 num_gpu: 1 # set num_gpu: 0 for cpu mode
 manual_seed: 10
@@ -26,7 +26,7 @@ datasets:
 
 # network structures
 network_g:
-  type: NAFNet
+  type: NAFNET
   width: 32
   enc_blk_nums: [2, 2, 4, 8]
   middle_blk_num: 12
@@ -34,7 +34,7 @@ network_g:
 
 # path
 path:
-  pretrain_network_g: experiments/NAFNet-SIDD-width32/models/net_g_195000.pth
+  pretrain_network_g: experiments/pretrained_models/NAFNet-SIDD-width32.pth
   strict_load_g: true
   resume_state: ~
 
