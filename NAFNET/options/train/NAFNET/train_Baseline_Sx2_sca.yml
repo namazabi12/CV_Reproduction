@@ -5,7 +5,7 @@
 # Copyright 2018-2020 BasicSR Authors
 # ------------------------------------------------------------------------
 # general settings
-name: NAFNet-SIDD-width32
+name: Baseline-SIDD-width32-small-sca
 model_type: NAFNETModel
 scale: 1
 num_gpu: 2
@@ -29,7 +29,7 @@ datasets:
     # data loader
     use_shuffle: true
     num_worker_per_gpu: 4
-    batch_size_per_gpu: 16
+    batch_size_per_gpu: 4
     dataset_enlarge_ratio: 1
     prefetch_mode: ~
 
@@ -43,11 +43,13 @@ datasets:
 
 
 network_g:
-  type: NAFNET
-  width: 16
-  enc_block_nums: [2, 2, 4, 8]
-  mid_block_nums: 12
-  dec_block_nums: [2, 2, 2, 2]
+  type: Baseline
+  width: 32
+  enc_block_nums: [1, 1, 2, 4]
+  mid_block_nums: 6
+  dec_block_nums: [1, 1, 1, 1]
+  sca: true
+  sg: False
 
 # path
 path:
@@ -66,10 +68,10 @@ train:
 
   scheduler:
     type: TrueCosineAnnealingLR
-    T_max: 200000
+    T_max: 150000
     eta_min: !!float 1e-7
 
-  total_iter: 400000
+  total_iter: 300000
   warmup_iter: -1 # no warm up
 
   # losses
