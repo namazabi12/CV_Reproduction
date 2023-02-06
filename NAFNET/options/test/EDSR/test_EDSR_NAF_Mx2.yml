@@ -31,7 +31,7 @@ datasets:
 
 # network structures
 network_g:
-  type: EDSR_HOAF
+  type: EDSR_NAF
   num_in_ch: 3
   num_out_ch: 3
   num_feat: 64
@@ -43,20 +43,20 @@ network_g:
 
 # path
 path:
-  pretrain_network_g: experiments/EDSR_Mx2_HOAF/models/net_g_300000.pth
+  pretrain_network_g: experiments/EDSR_Mx2_NAF/models/net_g_300000.pth
   strict_load_g: true
 
 # validation settings
 val:
-  save_img: true
+  save_img: false
   suffix: ~  # add suffix to saved images, if None, use exp name
 
   metrics:
     psnr: # metric name, can be arbitrary
       type: calculate_psnr
       crop_border: 2
-      test_y_channel: false
+      test_y_channel: yes
     ssim:
       type: calculate_ssim
       crop_border: 2
-      test_y_channel: false
+      test_y_channel: yes
