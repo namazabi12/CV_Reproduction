@@ -1,5 +1,5 @@
 # general settings
-name: EDSR_Mx2
+name: EDSR_Mx2_HOAF
 model_type: SRModel
 scale: 2
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -41,14 +41,14 @@ datasets:
 
 # network structures
 network_g:
-  type: EDSR
+  type: EDSR_HOAF
   num_in_ch: 3
   num_out_ch: 3
-  num_feat: 64
+  num_feat: 128
   num_block: 16
   upscale: 2
   res_scale: 1
-  img_range: 255.
+  img_range: 1.
   rgb_mean: [0.4488, 0.4371, 0.4040]
 
 # path

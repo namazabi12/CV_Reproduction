@@ -135,6 +135,20 @@ def train_pipeline(root_path):
         start_epoch = 0
         current_iter = 0
 
+
+    # net = model.net_g
+    # params = list(net.named_parameters())
+    # state = model.net_g.state_dict()
+    # a = params[0]
+    # # for param in params:
+    # #     print(1)
+    # # print(model.net_g.state_dict().keys())
+    # # params = list(model.net_g.parameters())
+    # # print(params)
+    # # print(model.net_g.state_dict()['enc_block.0.0.gate1.conv2.weight'])
+    # # return model
+    # return
+
     # create message logger (formatted outputs)
     msg_logger = MessageLogger(opt, current_iter, tb_logger)
 

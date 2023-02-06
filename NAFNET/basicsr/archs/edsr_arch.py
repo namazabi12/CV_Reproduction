@@ -1,8 +1,9 @@
 import torch
 from torch import nn as nn
 
-from basicsr.archs.arch_util import ResidualBlockNoBN, Upsample, make_layer
+from basicsr.archs.arch_util import default_init_weights, Upsample, make_layer, ResidualBlockNoBN
 from basicsr.utils.registry import ARCH_REGISTRY
+
 
 
 @ARCH_REGISTRY.register()
@@ -34,7 +35,7 @@ class EDSR(nn.Module):
                  num_block=16,
                  upscale=4,
                  res_scale=1,
-                 img_range=255.,
+                 img_range=1.,
                  rgb_mean=(0.4488, 0.4371, 0.4040)):
         super(EDSR, self).__init__()
 

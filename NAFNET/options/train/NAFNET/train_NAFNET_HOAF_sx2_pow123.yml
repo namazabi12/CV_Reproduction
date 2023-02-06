@@ -5,10 +5,10 @@
 # Copyright 2018-2020 BasicSR Authors
 # ------------------------------------------------------------------------
 # general settings
-name: NAFNet-HOAF-SIDD-width32
+name: NAFNet-HOAF-SIDD-width16-pow123
 model_type: HOAFModel
 scale: 1
-num_gpu: 2
+num_gpu: 1
 manual_seed: 10
 
 datasets:
@@ -28,8 +28,8 @@ datasets:
 
     # data loader
     use_shuffle: true
-    num_worker_per_gpu: 4
-    batch_size_per_gpu: 16
+    num_worker_per_gpu: 8
+    batch_size_per_gpu: 4
     dataset_enlarge_ratio: 1
     prefetch_mode: ~
 
@@ -43,11 +43,12 @@ datasets:
 
 
 network_g:
-  type: NAFNET
-  width: 16
+  type: NAFNET_HOAF
+  width: 8
   enc_block_nums: [1, 1, 2]
-  mid_block_nums: 4
+  mid_block_nums: 2
   dec_block_nums: [1, 1, 1]
+  num_pow: [1, 2, 3]
 
 # path
 path:
@@ -66,10 +67,10 @@ train:
 
   scheduler:
     type: TrueCosineAnnealingLR
-    T_max: 200000
+    T_max: 110000
     eta_min: !!float 1e-7
 
-  total_iter: 400000
+  total_iter: 110000
   warmup_iter: -1 # no warm up
 
   # losses
