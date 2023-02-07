@@ -54,8 +54,8 @@ class HOAF_v3(nn.Module):
 
         if 1 in self.num_pow:
             self.out_channels += self.out_channels1
-            # self.conv1 = nn.Conv2d(self.out_channels1 * self.num_groups, self.num_channels, kernel_size=1,
-            #                        groups=self.num_groups)
+            self.conv1 = nn.Conv2d(self.out_channels1 * self.num_groups, self.num_channels, kernel_size=1,
+                                   groups=self.num_groups)
         if 2 in self.num_pow:
             self.out_channels += self.out_channels2
             self.conv2 = nn.Conv2d(self.out_channels2 * self.num_groups, self.num_channels, kernel_size=1,
@@ -203,7 +203,10 @@ class ResidualBlockNoBN_NAF_HOAF(nn.Module):
         self.conv5 = nn.Conv2d(num_feat, num_feat, 1, 1, 0, bias=True)
 
         self.gelu = nn.GELU()
-        self.hoaf = HOAF_v3(num_feat // 8, num_feat // 2, [1, 2])
+        # self.hoaf1 = HOAF_v3(num_feat // 8, num_feat // 2, [1, 2])
+        # self.hoaf1 = HOAF_v3(num_feat // 4, num_feat, [1, 2])
+        self.hoaf2 = HOAF_v3(num_feat // 8, num_feat // 2, [1, 2])
+        # self.hoaf2 = HOAF_v3(num_feat // 4, num_feat, [1, 2])
         self.sca = SCA(num_feat)
 
         self.beta1 = nn.Parameter(torch.ones((1, num_feat, 1, 1)), requires_grad=True)
@@ -217,8 +220,9 @@ class ResidualBlockNoBN_NAF_HOAF(nn.Module):
         y = self.norm1(x)
         y = self.conv1(y)
         y = self.conv2(y)
-        mid = torch.chunk(y, 2, dim=1)
-        y = torch.cat([mid[0], self.hoaf(mid[1])], dim=1)
+        # mid = torch.chunk(y, 2, dim=1)
+        # y = torch.cat([mid[0], self.hoaf(mid[1])], dim=1)
+        # y = self.hoaf1(y)
         y = self.gelu(y)
         y = self.sca(y)
         # y = y * self.convca(self.gap(y))
@@ -228,6 +232,9 @@ class ResidualBlockNoBN_NAF_HOAF(nn.Module):
         identity = y
         y = self.norm2(y)
         y = self.conv4(y)
+        mid = torch.chunk(y, 2, dim=1)
+        y = torch.cat([mid[0], self.hoaf2(mid[1])], dim=1)
+        # y = self.hoaf2(y)
         y = self.gelu(y)
         y = self.conv5(y)
         return identity + y * self.beta2
