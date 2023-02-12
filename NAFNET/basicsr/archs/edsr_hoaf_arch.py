@@ -1,8 +1,10 @@
 import torch
 from torch import nn as nn
+import torch.nn.functional as F
 
 from basicsr.archs.arch_util import ResidualBlockNoBN, Upsample, make_layer, default_init_weights
 from basicsr.utils.registry import ARCH_REGISTRY
+from math import sqrt
 
 from PIL import Image
 
@@ -60,6 +62,7 @@ class HOAF_v3(nn.Module):
             self.out_channels += self.out_channels2
             self.conv2 = nn.Conv2d(self.out_channels2 * self.num_groups, self.num_channels, kernel_size=1,
                                    groups=self.num_groups)
+            self.norm2 = nn.GroupNorm(1, self.out_channels2 * self.num_groups)
 
         self.beta2 = nn.Parameter(torch.ones((1, self.num_channels, 1, 1)), requires_grad=True)
 
@@ -79,10 +82,36 @@ class HOAF_v3(nn.Module):
         if 1 in self.num_pow:
             output = output + inp
         if 2 in self.num_pow:
-            output = output + self.conv2(channel_shuffle(torch.cat(output_c2, dim=1), self.num_groups)) * self.beta2
+            output = output + self.conv2(self.norm2(channel_shuffle(torch.cat(output_c2, dim=1), self.num_groups)))\
+                     * self.beta2
         # print("inp: ", inp)
         # print("oup: ", output)
         return output
+
+
+class HOAF_v4(nn.Module):
+    """HOAF(High Order Activation Function) structure.
+
+        Args:
+            num_channels (int): number of channels expected in input
+    """
+    __constants__ = ['num_channels']
+    num_channels: int
+
+    def __init__(self, num_channels, scale=2):
+        super(HOAF_v4, self).__init__()
+
+        self.num_channels = num_channels
+        self.downsample = nn.AvgPool2d(kernel_size=scale, stride=scale)
+        self.upsample = nn.Upsample(scale_factor=scale, mode='nearest')
+        self.norm = nn.GroupNorm(1, num_channels)
+        # self.upsample = nn.Upsample(scale_factor=scale, mode='bilinear')
+        # self.upsample = nn.Upsample(scale_factor=scale, mode='bicubic')
+
+
+    def forward(self, inp):
+        x = self.norm(inp)
+        return inp + x * (x - self.upsample(self.downsample(x)))
 
 
 class ResidualBlockNoBN_HOAF(nn.Module):
@@ -125,6 +154,128 @@ class SCA(nn.Module):
 
     def forward(self, x):
         return x * self.conv(self.gap(x))
+
+
+class SCA_v2(nn.Module):
+    def __init__(self, num_feat=64, scale=8):
+        super(SCA_v2, self).__init__()
+
+        self.num_feat = num_feat
+        self.scale = scale
+        self.pool = nn.AvgPool2d(kernel_size=scale, stride=scale)
+        self.conv1 = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
+        self.gap = nn.AdaptiveAvgPool2d(1)
+        self.conv2 = nn.Conv2d(num_feat, num_feat, 1, 1, 0)
+
+    def forward(self, x):
+        return x * self.conv2(self.gap(self.conv1(self.pool(x))))
+
+
+class SelfAttention(nn.Module):
+    def __init__(self, dim_q, dim_k, dim_v):
+        super(SelfAttention, self).__init__()
+
+        self.dim_q, self.dim_k, self.dim_v = dim_q, dim_k, dim_v
+        self.linear_q = nn.Linear(dim_q, dim_k, bias=False)
+        self.linear_k = nn.Linear(dim_q, dim_k, bias=False)
+        self.linear_v = nn.Linear(dim_q, dim_v, bias=False)
+
+        self._norm_fact = 1 / sqrt(dim_k)
+
+    def forward(self, x):
+        batch, c, n = x.shape
+        assert n == self.dim_q
+
+        q = self.linear_q(x)  # batch, c, dim_k
+        k = self.linear_k(x)  # batch, c, dim_k
+        v = self.linear_v(x)  # batch, c, dim_v
+
+        dist = torch.bmm(q, k.transpose(1, 2)) * self._norm_fact  # batch, c, c
+
+        dist = torch.softmax(dist, dim=-1)  # batch, c, c
+
+        att = torch.bmm(dist, v)
+
+        return att
+
+
+class SelfAttention2(nn.Module):
+    def __init__(self, dim_q, dim_k, dim_v):
+        super(SelfAttention2, self).__init__()
+
+        self.dim_q, self.dim_k, self.dim_v = dim_q, dim_k, dim_v
+        self.linear_q = nn.Linear(dim_q, dim_k, bias=False)
+        self.linear_k = nn.Linear(dim_q, dim_k, bias=False)
+        # self.linear_v = nn.Linear(dim_q, dim_v, bias=False)
+
+        self._norm_fact = 1 / sqrt(dim_k)
+
+    def forward(self, x):
+        batch, c, n = x.shape
+        assert n == self.dim_q
+
+        q = self.linear_q(x)  # batch, c, dim_k
+        k = self.linear_k(x)  # batch, c, dim_k
+        # v = self.linear_v(x)  # batch, c, dim_v
+
+        dist = torch.bmm(q, k.transpose(1, 2)) * self._norm_fact  # batch, c, c
+
+        dist = torch.softmax(dist, dim=-1)  # batch, c, c
+
+        # att = torch.bmm(dist, v)
+
+        return dist
+
+
+class SCA_v3(nn.Module):
+    def __init__(self, num_feat=64, gap_size=8):
+        super(SCA_v3, self).__init__()
+
+        self.num_feat = num_feat
+
+        self.gap1 = nn.AdaptiveAvgPool2d(gap_size)
+        self.gap2 = nn.AdaptiveAvgPool2d(1)
+        self.norm = nn.GroupNorm(1, num_feat)
+        self.gap_size = gap_size
+        self.win_size = gap_size ** 2
+
+        self.SA = SelfAttention(self.win_size, self.win_size, self.win_size)
+
+    def forward(self, x):
+        batch, c, h, w = x.shape
+        # y = self.norm(x)
+        y = self.gap1(x)
+        y = y.reshape([batch, c, self.win_size])
+        y = self.SA(y)
+        y = y.reshape([batch, c, self.gap_size, self.gap_size])
+        y = self.gap2(y)
+        return x + y
+
+
+class SCA_v4(nn.Module):
+    def __init__(self, num_feat=64, gap_size=8):
+        super(SCA_v4, self).__init__()
+
+        self.num_feat = num_feat
+
+        self.gap1 = nn.AdaptiveAvgPool2d(gap_size)
+        self.norm = nn.GroupNorm(1, num_feat)
+        self.gap_size = gap_size
+        self.win_size = gap_size ** 2
+
+        self.SA = SelfAttention2(self.win_size, self.win_size, self.win_size)
+
+    def forward(self, x):
+        batch, c, h, w = x.shape
+        y = self.norm(x)
+        y = self.gap1(y)
+        y = y.reshape([batch, c, self.win_size])
+        dist = self.SA(y)
+        # y = y.reshape([batch, c, self.gap_size, self.gap_size])
+        # y = self.gap2(y)
+        x = x.reshape([batch, c, h * w])
+        x = torch.bmm(dist, x).reshape([batch, c, h, w])
+        return x
 
 
 class ResidualBlockNoBN_NAF(nn.Module):
@@ -205,9 +356,14 @@ class ResidualBlockNoBN_NAF_HOAF(nn.Module):
         self.gelu = nn.GELU()
         # self.hoaf1 = HOAF_v3(num_feat // 8, num_feat // 2, [1, 2])
         # self.hoaf1 = HOAF_v3(num_feat // 4, num_feat, [1, 2])
-        self.hoaf2 = HOAF_v3(num_feat // 8, num_feat // 2, [1, 2])
+        # self.hoaf2 = HOAF_v3(num_feat // 8, num_feat // 2, [1, 2])
         # self.hoaf2 = HOAF_v3(num_feat // 4, num_feat, [1, 2])
-        self.sca = SCA(num_feat)
+        # self.hoaf1 = HOAF_v4(num_channels=num_feat, scale=2)
+        # self.hoaf2 = HOAF_v4(num_channels=num_feat, scale=2)
+        # self.sca = SCA(num_feat)
+        # self.sca = SCA_v2(n  um_feat, scale=8)
+        self.sca = SCA_v3(num_feat, gap_size=4)
+        # self.sca = SCA_v4(num_feat, gap_size=4)
 
         self.beta1 = nn.Parameter(torch.ones((1, num_feat, 1, 1)), requires_grad=True)
         self.beta2 = nn.Parameter(torch.ones((1, num_feat, 1, 1)), requires_grad=True)
@@ -223,24 +379,25 @@ class ResidualBlockNoBN_NAF_HOAF(nn.Module):
         # mid = torch.chunk(y, 2, dim=1)
         # y = torch.cat([mid[0], self.hoaf(mid[1])], dim=1)
         # y = self.hoaf1(y)
+        # y = self.norm(y)
         y = self.gelu(y)
         y = self.sca(y)
-        # y = y * self.convca(self.gap(y))
         y = self.conv3(y)
         y = identity + y * self.beta1
 
         identity = y
         y = self.norm2(y)
         y = self.conv4(y)
-        mid = torch.chunk(y, 2, dim=1)
-        y = torch.cat([mid[0], self.hoaf2(mid[1])], dim=1)
+        # mid = torch.chunk(y, 2, dim=1)
+        # y = self.gelu(y)
+        # y = torch.cat([y, self.hoaf2(y)], dim=1)
         # y = self.hoaf2(y)
         y = self.gelu(y)
         y = self.conv5(y)
         return identity + y * self.beta2
 
 
-@ARCH_REGISTRY.register()
+# @ARCH_REGISTRY.register()
 class EDSR_HOAF(nn.Module):
     """EDSR network structure.
 
@@ -297,7 +454,7 @@ class EDSR_HOAF(nn.Module):
         return x
 
 
-@ARCH_REGISTRY.register()
+# @ARCH_REGISTRY.register()
 class EDSR_NAF(nn.Module):
     def __init__(self,
                  num_in_ch,
@@ -349,6 +506,8 @@ class EDSR_NAF_HOAF(nn.Module):
 
         self.img_range = img_range
         self.mean = torch.Tensor(rgb_mean).view(1, 3, 1, 1)
+        self.mod = 4
+        self.upscale = upscale
 
         self.conv_first = nn.Conv2d(num_in_ch, num_feat, 3, 1, 1)
         self.body = make_layer(ResidualBlockNoBN_NAF_HOAF, num_block, num_feat=num_feat, res_scale=res_scale,
@@ -358,6 +517,8 @@ class EDSR_NAF_HOAF(nn.Module):
         self.conv_last = nn.Conv2d(num_feat, num_out_ch, 3, 1, 1)
 
     def forward(self, x):
+        # h, w = x.shape[-2], x.shape[-1]
+        # x = self.pad_to_pow(x)
         self.mean = self.mean.type_as(x)
 
         x = (x - self.mean) * self.img_range
@@ -369,5 +530,17 @@ class EDSR_NAF_HOAF(nn.Module):
         x = x / self.img_range + self.mean
 
         return x
+        # return x[:, :, :h * self.upscale, :w * self.upscale]
+
+    def pad_to_pow(self, inp):
+        h, w = inp.shape[-2], inp.shape[-1]
+        h_pad = (self.mod - h % self.mod) % self.mod
+        w_pad = (self.mod - w % self.mod) % self.mod
+        return F.pad(inp, (0, w_pad, 0, h_pad))
 
 
+if __name__ == "__main__":
+    a = torch.randn([4, 64, 32, 32])
+    sca = SCA_v4(64, 8)
+    print(a)
+    print(sca(a))

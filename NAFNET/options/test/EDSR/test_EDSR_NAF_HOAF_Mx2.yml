@@ -43,7 +43,7 @@ network_g:
 
 # path
 path:
-  pretrain_network_g: experiments/EDSR_Mx2_NAF/models/net_g_225000.pth
+  pretrain_network_g: experiments/EDSR_Mx2_NAF_HOAF/models/net_g_400000.pth
   strict_load_g: true
 
 # validation settings
