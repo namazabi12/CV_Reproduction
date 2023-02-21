@@ -5,7 +5,7 @@
 name: train_SwinIR_SRx2_scratch_P48W8_DIV2K_500k_B4G8
 model_type: SwinIRModel
 scale: 2
-num_gpu: auto
+num_gpu: 1
 manual_seed: 0
 
 # dataset and data loader settings
@@ -13,9 +13,9 @@ datasets:
   train:
     name: DIV2K
     type: PairedImageDataset
-    dataroot_gt: datasets/DF2K/DIV2K_train_HR_sub
-    dataroot_lq: datasets/DF2K/DIV2K_train_LR_bicubic_X2_sub
-    meta_info_file: basicsr/data/meta_info/meta_info_DIV2K800sub_GT.txt
+    dataroot_gt: datasets/DIV2K/DIV2K_train_HR_sub
+    dataroot_lq: datasets/DIV2K/DIV2K_train_LR_bicubic/X2_sub
+#    meta_info_file: basicsr/data/meta_info/meta_info_DIV2K800sub_GT.txt
     filename_tmpl: '{}'
     io_backend:
       type: disk
@@ -26,7 +26,7 @@ datasets:
 
     # data loader
     num_worker_per_gpu: 6
-    batch_size_per_gpu: 4
+    batch_size_per_gpu: 32
     dataset_enlarge_ratio: 1
     prefetch_mode: ~
 
@@ -46,11 +46,11 @@ network_g:
   img_size: 48
   window_size: 8
   img_range: 1.
-  depths: [6, 6, 6, 6, 6, 6]
-  embed_dim: 180
-  num_heads: [6, 6, 6, 6, 6, 6]
-  mlp_ratio: 2
-  upsampler: 'pixelshuffle'
+  depths: [6, 6, 6, 6]
+  embed_dim: 60
+  num_heads: [6, 6, 6, 6]
+  mlp_ratio: 1
+  upsampler: 'pixelshuffledirect'
   resi_connection: '1conv'
 
 # path
@@ -91,7 +91,7 @@ val:
     psnr: # metric name, can be arbitrary
       type: calculate_psnr
       crop_border: 2
-      test_y_channel: false
+      test_y_channel: yes
 
 # logging settings
 logger:

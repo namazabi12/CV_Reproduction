@@ -1,9 +1,12 @@
+
+
+
 # general settings
-name: EDSR_Mx2_NAF_HOAF
-model_type: SRModel
+name: train_GAP_SwinIR_SRx2
+model_type: SwinIRModel
 scale: 2
-num_gpu: 1  # set num_gpu: 0 for cpu mode
-manual_seed: 10
+num_gpu: 1
+manual_seed: 0
 
 # dataset and data loader settings
 datasets:
@@ -12,14 +15,10 @@ datasets:
     type: PairedImageDataset
     dataroot_gt: datasets/DIV2K/DIV2K_train_HR_sub
     dataroot_lq: datasets/DIV2K/DIV2K_train_LR_bicubic/X2_sub
-    # (for lmdb)
-    # dataroot_gt: datasets/DIV2K/DIV2K_train_HR_sub.lmdb
-    # dataroot_lq: datasets/DIV2K/DIV2K_train_LR_bicubic_X2_sub.lmdb
+#    meta_info_file: basicsr/data/meta_info/meta_info_DIV2K800sub_GT.txt
     filename_tmpl: '{}'
     io_backend:
       type: disk
-      # (for lmdb)
-      # type: lmdb
 
     gt_size: 96
     use_hflip: true
@@ -27,8 +26,8 @@ datasets:
 
     # data loader
     num_worker_per_gpu: 6
-    batch_size_per_gpu: 16
-    dataset_enlarge_ratio: 100
+    batch_size_per_gpu: 32
+    dataset_enlarge_ratio: 1
     prefetch_mode: ~
 
   val:
@@ -41,16 +40,19 @@ datasets:
 
 # network structures
 network_g:
-  type: EDSR_NAF_HOAF
-  num_in_ch: 3
-  num_out_ch: 3
-  num_feat: 64
-  num_block: 4
-  depth: [4, 4, 4, 4]
+  type: GAP_SwinIR
   upscale: 2
-  res_scale: 1
+  in_chans: 3
+  img_size: 48
+  window_size: 8
+  pool_size: 8
   img_range: 1.
-  rgb_mean: [0.4488, 0.4371, 0.4040]
+  depths: [6, 6, 6, 6]
+  embed_dim: 60
+  num_heads: [6, 6, 6, 6]
+  mlp_ratio: 1
+  upsampler: 'pixelshuffledirect'
+  resi_connection: '1conv'
 
 # path
 path:
@@ -63,16 +65,16 @@ train:
   ema_decay: 0.999
   optim_g:
     type: Adam
-    lr: !!float 5e-4
+    lr: !!float 2e-4
     weight_decay: 0
     betas: [0.9, 0.99]
 
   scheduler:
     type: MultiStepLR
-    milestones: [200000, 300000, 350000, 375000]
+    milestones: [250000, 400000, 450000, 475000]
     gamma: 0.5
 
-  total_iter: 400000
+  total_iter: 500000
   warmup_iter: -1  # no warm up
 
   # losses
